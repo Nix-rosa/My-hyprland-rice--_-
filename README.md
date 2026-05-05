@@ -19,8 +19,8 @@ una duda de como funciona envienme un mensaje por correo
 
 ~/Manga/
 ├── My Dress-Up Darling/
-│   ├── port.jpg          # Series cover
-│   ├── logo.txt          # ASCII logo (auto-generated)
+│   ├── port.jpg         
+│   ├── logo.txt          
 │   ├── Chapter 1.cbz
 │   └── ...
 ~/Anime/

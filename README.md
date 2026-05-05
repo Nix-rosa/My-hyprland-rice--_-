@@ -11,5 +11,5 @@ Terminal manga/anime library con ASCII art logos.
 - 📊 Estadísticas detalladas
 
 
-#hola esta es mi configuración de hyprland en manjaro si tienen
+#hola esta es mi script de media lab si tienen
 una duda de como funciona envienme un mensaje por correos

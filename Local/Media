@@ -1,1 +1,377 @@
+#!/bin/bash
+
+# ========================================
+# MEDIA LAB v7 - ASCII Logos
+# ========================================
+
+MANGA_DIR=~/Manga
+ANIME_DIR=~/Anime
+
+# Colores
+NEON_PINK='\033[38;5;199m'
+NEON_BLUE='\033[38;5;51m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+RESET='\033[0m'
+
+# =====================
+# GENERAR LOGO ASCII
+# =====================
+generate_ascii_logo() {
+  DIR="$1"
+  LOGO_FILE="$DIR/logo.txt"
+  
+  # Si ya existe, no regenerar
+  [ -f "$LOGO_FILE" ] && return
+  
+  # Opción 1: Si hay port.jpg, convertir a ASCII
+  if [ -f "$DIR/port.jpg" ]; then
+    jp2a --width=60 "$DIR/port.jpg" > "$LOGO_FILE" 2>/dev/null
+    return
+  fi
+  
+  # Opción 2: Crear logo con el nombre de la serie
+  SERIES_NAME=$(basename "$DIR")
+  
+  # Intentar con figlet
+  if command -v figlet >/dev/null 2>&1; then
+    figlet -w 60 -f slant "$SERIES_NAME" > "$LOGO_FILE" 2>/dev/null
+  else
+    # Fallback: texto simple
+    cat > "$LOGO_FILE" << EOF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            $SERIES_NAME
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF
+  fi
+}
+
+# =====================
+# NORMALIZAR PORTADA DE SERIE
+# =====================
+normalize_cover() {
+  DIR="$1"
+  [ -f "$DIR/port.jpg" ] && return
+
+  # 1. Imagen local
+  IMG=$(find "$DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.png" \) 2>/dev/null | head -1)
+  if [ -n "$IMG" ]; then
+    cp "$IMG" "$DIR/port.jpg" 2>/dev/null
+    return
+  fi
+
+  # 2. Del CBZ
+  CBZ=$(find "$DIR" -name "*.cbz" 2>/dev/null | head -1)
+  if [ -n "$CBZ" ]; then
+    IMG_IN=$(unzip -Z1 "$CBZ" 2>/dev/null | grep -Ei "\.(jpg|png)" | head -1)
+    [ -n "$IMG_IN" ] && unzip -p "$CBZ" "$IMG_IN" > "$DIR/port.jpg" 2>/dev/null && return
+  fi
+
+  # 3. AniList API
+  NAME=$(basename "$DIR")
+  COVER_URL=$(curl -s https://graphql.anilist.co \
+    -H "Content-Type: application/json" \
+    --data "{\"query\": \"query { Media(search: \\\"$NAME\\\", type: MANGA) { coverImage { large }}}\"}" \
+    2>/dev/null | jq -r '.data.Media.coverImage.large' 2>/dev/null)
+
+  [ "$COVER_URL" != "null" ] && [ -n "$COVER_URL" ] && curl -s "$COVER_URL" -o "$DIR/port.jpg" 2>/dev/null
+}
+
+# =====================
+# BANNER
+# =====================
+show_banner() {
+  clear
+  echo -e "${NEON_PINK}"
+  figlet -f slant "MEDIA LAB" 2>/dev/null || echo "=== MEDIA LAB v7 ==="
+  echo -e "${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+}
+
+# =====================
+# ESTADÍSTICAS
+# =====================
+show_stats() {
+  local manga_count=$(find "$MANGA_DIR" -name "*.cbz" 2>/dev/null | wc -l)
+  local anime_count=$(find "$ANIME_DIR" \( -name "*.mkv" -o -name "*.mp4" \) 2>/dev/null | wc -l)
+  
+  echo ""
+  echo -e "${NEON_BLUE}📚 Manga:${RESET} $manga_count volúmenes"
+  echo -e "${NEON_BLUE}🎬 Anime:${RESET} $anime_count episodios"
+  echo ""
+}
+
+# =====================
+# MENÚ PRINCIPAL
+# =====================
+main_menu() {
+  show_banner
+  show_stats
+  
+  echo -e "${MAGENTA}┌─ Selecciona una opción:${RESET}"
+  echo -e "${CYAN}│${RESET}"
+  echo -e "${CYAN}│  1)${RESET} 📖 Leer Manga"
+  echo -e "${CYAN}│  2)${RESET} 🎬 Ver Anime"
+  echo -e "${CYAN}│  3)${RESET} 📊 Estadísticas detalladas"
+  echo -e "${CYAN}│  4)${RESET} 🔍 Buscar por título"
+  echo -e "${CYAN}│  5)${RESET} 🎲 Aleatorio (sorpréndeme)"
+  echo -e "${CYAN}│  q)${RESET} 🚪 Salir"
+  echo -e "${CYAN}│${RESET}"
+  echo -e "${MAGENTA}└─${RESET}"
+  echo ""
+  echo -n -e "${NEON_PINK}▶${RESET} "
+  read -r choice
+  
+  case $choice in
+    1) browse_series ;;
+    2) browse_anime ;;
+    3) detailed_stats ;;
+    4) search_all ;;
+    5) random_pick ;;
+    q|Q) exit 0 ;;
+    *) echo "Opción inválida"; sleep 1; main_menu ;;
+  esac
+}
+
+# =====================
+# SERIES
+# =====================
+browse_series() {
+  COUNT=$(find "$MANGA_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+  
+  if [ "$COUNT" -eq 0 ]; then
+    echo -e "${NEON_PINK}❌ No hay series en $MANGA_DIR${RESET}"
+    sleep 2
+    main_menu
+    return
+  fi
+  
+  # Pre-generar portadas y logos
+  echo -e "${CYAN}⏳ Verificando portadas y logos ASCII...${RESET}"
+  for DIR in "$MANGA_DIR"/*; do
+    if [ -d "$DIR" ]; then
+      normalize_cover "$DIR" &
+      generate_ascii_logo "$DIR" &
+    fi
+  done
+  wait
+
+  SERIES=$(find "$MANGA_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | \
+    fzf --preview 'timg -g 60x40 {}/port.jpg 2>/dev/null || echo "❌ Sin portada"' \
+        --preview-window=right:60% \
+        --height=100% \
+        --border=rounded \
+        --prompt="📚 " \
+        --header="MANGA - Selecciona serie (ESC para volver)" \
+        --color="fg:#c0caf5,bg:-1,hl:#ff007c,fg+:#ffffff,bg+:-1,hl+:#ff007c,info:#7aa2f7,prompt:#ff007c,pointer:#ff007c,border:#7aa2f7")
+
+  [ -z "$SERIES" ] && main_menu
+  browse_chapters "$SERIES"
+}
+
+# =====================
+# CAPÍTULOS (con ASCII logo)
+# =====================
+browse_chapters() {
+  DIR="$1"
+  
+  COUNT=$(find "$DIR" -name "*.cbz" 2>/dev/null | wc -l)
+  
+  if [ "$COUNT" -eq 0 ]; then
+    echo -e "${NEON_PINK}❌ No hay capítulos en esta serie${RESET}"
+    sleep 2
+    browse_series
+    return
+  fi
+  
+  # Asegurar que existe el logo ASCII
+  generate_ascii_logo "$DIR"
+  
+  FILE=$(find "$DIR" -name "*.cbz" 2>/dev/null | sort -V | \
+    fzf --preview "cat '$DIR/logo.txt' 2>/dev/null || echo '❌ Sin logo ASCII'" \
+        --preview-window=right:60% \
+        --height=100% \
+        --border=rounded \
+        --prompt="📖 " \
+        --header="CAPÍTULOS - Todos comparten el mismo logo ASCII (ESC para volver)" \
+        --color="fg:#c0caf5,bg:-1,hl:#ff007c,fg+:#ffffff,bg+:-1,hl+:#ff007c,info:#7aa2f7,prompt:#ff007c,pointer:#ff007c,border:#7aa2f7")
+  if [ -n "$FILE" ]; then
+    echo -e "\n${NEON_BLUE}📖 Abriendo:${RESET} $(basename "$FILE")"
+    /usr/bin/zathura "$FILE" 2>/dev/null &
+    sleep 1
+  fi
+  
+  browse_series
+}
+
+# =====================
+# ANIME
+# =====================
+browse_anime() {
+  COUNT=$(find "$ANIME_DIR" \( -name "*.mkv" -o -name "*.mp4" \) 2>/dev/null | wc -l)
+  
+  if [ "$COUNT" -eq 0 ]; then
+    echo -e "${NEON_PINK}❌ No hay anime en $ANIME_DIR${RESET}"
+    sleep 2
+    main_menu
+    return
+  fi
+  
+  FILE=$(find "$ANIME_DIR" \( -name "*.mkv" -o -name "*.mp4" \) 2>/dev/null | \
+    fzf --preview 'ffmpeg -ss 00:00:10 -i {} -vframes 1 -f image2 pipe:1 2>/dev/null | timg -g 60x40 -' \
+        --preview-window=right:60% \
+        --height=100% \
+        --border=rounded \
+        --prompt="🎬 " \
+        --header="ANIME - Selecciona episodio (ESC para volver)" \
+        --color="fg:#c0caf5,bg:-1,hl:#ff007c,fg+:#ffffff,bg+:-1,hl+:#ff007c,info:#7aa2f7,prompt:#ff007c,pointer:#ff007c,border:#7aa2f7")
+  if [ -n "$FILE" ]; then
+    echo -e "\n${NEON_BLUE}🎬 Reproduciendo:${RESET} $(basename "$FILE")"
+    mpv --keep-open=yes "$FILE" 2>/dev/null
+  fi
+  
+  main_menu
+}
+
+# =====================
+# ESTADÍSTICAS DETALLADAS
+# =====================
+detailed_stats() {
+  show_banner
+  
+  echo -e "${NEON_PINK}📊 ESTADÍSTICAS DETALLADAS${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+  
+  local manga_count=$(find "$MANGA_DIR" -name "*.cbz" 2>/dev/null | wc -l)
+  local anime_count=$(find "$ANIME_DIR" \( -name "*.mkv" -o -name "*.mp4" \) 2>/dev/null | wc -l)
+  local manga_size=$(du -sh "$MANGA_DIR" 2>/dev/null | awk '{print $1}')
+  local anime_size=$(du -sh "$ANIME_DIR" 2>/dev/null | awk '{print $1}')
+  
+  echo -e "${MAGENTA}📚 MANGA:${RESET}"
+  echo -e "   Volúmenes: ${NEON_BLUE}$manga_count${RESET}"
+  echo -e "   Tamaño total: ${NEON_BLUE}$manga_size${RESET}"
+  echo ""
+  
+  echo -e "${MAGENTA}🎬 ANIME:${RESET}"
+  echo -e "   Episodios: ${NEON_BLUE}$anime_count${RESET}"
+  echo -e "   Tamaño total: ${NEON_BLUE}$anime_size${RESET}"
+  echo ""
+  
+  echo -e "${MAGENTA}📁 Top 5 Series (manga):${RESET}"
+  find "$MANGA_DIR" -name "*.cbz" 2>/dev/null | xargs -I {} dirname {} | sort | uniq -c | sort -rn | head -5 | while read count dir; do
+    echo -e "   ${NEON_BLUE}$count${RESET} - $(basename "$dir")"
+  done
+  
+  echo ""
+  echo -n -e "${CYAN}Presiona Enter para continuar...${RESET}"
+  read
+  main_menu
+}
+
+# =====================
+# BÚSQUEDA GLOBAL
+# =====================
+search_all() {
+  show_banner
+  echo -e "${NEON_PINK}🔍 Búsqueda Global${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+  echo -n -e "${MAGENTA}Buscar:${RESET} "
+  read query
+  
+  if [ -z "$query" ]; then
+    main_menu
+    return
+  fi
+  
+  RESULT=$(
+    (find "$MANGA_DIR" -name "*.cbz" 2>/dev/null | grep -i "$query" | sed 's/^/[MANGA] /'; \
+     find "$ANIME_DIR" \( -name "*.mkv" -o -name "*.mp4" \) 2>/dev/null | grep -i "$query" | sed 's/^/[ANIME] /') | \
+    fzf --prompt="📁 " \
+        --header="Resultados de búsqueda: $query" \
+        --color="fg:#c0caf5,bg:-1,hl:#ff007c,fg+:#ffffff,bg+:-1,hl+:#ff007c,info:#7aa2f7,prompt:#ff007c,pointer:#ff007c,border:#7aa2f7")
+  
+  if [ -n "$RESULT" ]; then
+    TYPE=$(echo "$RESULT" | awk '{print $1}')
+    FILE=$(echo "$RESULT" | sed 's/^\[.*\] //')
+    
+    if [[ "$TYPE" == "[MANGA]" ]]; then
+      echo -e "\n${NEON_BLUE}📖 Abriendo:${RESET} $(basename "$FILE")"
+      /usr/bin/zathura "$FILE" 2>/dev/null &
+    else
+      echo -e "\n${NEON_BLUE}🎬 Reproduciendo:${RESET} $(basename "$FILE")"
+      mpv "$FILE" 2>/dev/null
+    fi
+    sleep 1
+  fi
+  
+  main_menu
+}
+
+# =====================
+# MODO ALEATORIO
+# =====================
+random_pick() {
+  show_banner
+  echo -e "${NEON_PINK}🎲 Modo Aleatorio${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+  echo -e "${MAGENTA}¿Qué quieres?${RESET}"
+  echo "  1) Manga aleatorio"
+  echo "  2) Anime aleatorio"
+  echo "  3) Cualquier cosa (sorpresa total)"
+  echo ""
+  echo -n -e "${NEON_PINK}▶${RESET} "
+  read choice
+  
+  case $choice in
+    1)
+      FILE=$(find "$MANGA_DIR" -name "*.cbz" 2>/dev/null | shuf -n 1)
+      if [ -n "$FILE" ]; then
+        echo -e "\n${NEON_BLUE}🎰 Seleccionado:${RESET} $(basename "$FILE")"
+        sleep 1
+        /usr/bin/zathura "$FILE" 2>/dev/null &
+      else
+        echo -e "${NEON_PINK}❌ No hay manga disponible${RESET}"
+      fi
+      ;;
+    2)
+      FILE=$(find "$ANIME_DIR" \( -name "*.mkv" -o -name "*.mp4" \) 2>/dev/null | shuf -n 1)
+      if [ -n "$FILE" ]; then
+        echo -e "\n${NEON_BLUE}🎰 Seleccionado:${RESET} $(basename "$FILE")"
+        sleep 1
+        mpv "$FILE" 2>/dev/null
+      else
+        echo -e "${NEON_PINK}❌ No hay anime disponible${RESET}"
+      fi
+      ;;
+    3)
+      FILE=$(
+        (find "$MANGA_DIR" -name "*.cbz" 2>/dev/null; \
+         find "$ANIME_DIR" \( -name "*.mkv" -o -name "*.mp4" \) 2>/dev/null) | shuf -n 1
+      )
+      if [ -n "$FILE" ]; then
+        echo -e "\n${NEON_BLUE}🎰 Seleccionado:${RESET} $(basename "$FILE")"
+        sleep 1
+        
+        if [[ "$FILE" == *.cbz ]]; then
+          /usr/bin/zathura "$FILE" 2>/dev/null &
+        else
+          mpv "$FILE" 2>/dev/null
+        fi
+      else
+        echo -e "${NEON_PINK}❌ No hay contenido disponible${RESET}"
+      fi
+      ;;
+  esac
+  
+  sleep 2
+  main_menu
+}
+
+# =====================
+# INICIO
+# =====================
+main_menu
 

@@ -13,20 +13,13 @@ Terminal manga/anime library con ASCII art logos.
 -🔳Dependencies
 sudo pacman -S fzf timg jp2a figlet mpv zathura curl jq
 -✍️ para usarlo se escribe media
+-❤️las carpetas van en el home la primera en mayúscula ejem Manga/Anim
+-📕Las portadas de los mangas deban de ir en la misma carpeta y renombrala a cover
+
+
 
 #hola esta es mi script de media lab si tienen
 una duda de como funciona envienme un mensaje por correo
-
-~/Manga/
-├── My Dress-Up Darling/
-│   ├── port.jpg         
-│   ├── logo.txt          
-│   ├── Chapter 1.cbz
-│   └── ...
-~/Anime/
-├── episode1.mkv
-└── ...
-
 
 Navigate with:
 1 - Browse manga

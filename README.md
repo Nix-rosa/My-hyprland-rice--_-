@@ -1,10 +1,15 @@
+# Media Lab v7 🔥
 
- _   ___   ______  ____  _        _    _   _ ____
-| | | \ \ / /  _ \|  _ \| |      / \  | \ | |  _ \
-| |_| |\ V /| |_) | |_) | |     / _ \ |  \| | | | |
-|  _  | | | |  __/|  _ <| |___ / ___ \| |\  | |_| |
-|_| |_| |_| |_|   |_| \_\_____/_/   \_\_| \_|____/
+Terminal manga/anime library con ASCII art logos.
+
+## Features
+- 📚 Browse manga con portadas (timg)
+- 🎬 Browse anime con video preview
+- 🎨 ASCII logos únicos por serie
+- 🔍 Búsqueda global
+- 🎲 Modo aleatorio
+- 📊 Estadísticas detalladas
 
 
 #hola esta es mi configuración de hyprland en manjaro si tienen
-una duda de como funciona envienme un mensaje por correo 
+una duda de como funciona envienme un mensaje por correos

@@ -10,8 +10,7 @@ Terminal manga/anime library con ASCII art logos.
 - 🎲 Modo aleatorio
 - 📊 Estadísticas detalladas
 -📖 Funciona con  fomato de manga cbz y animes de formato mp4,mkv
--🔳Dependencies
-sudo pacman -S fzf timg jp2a figlet mpv zathura curl jq
+-🔳Dependenciessudo pacman -S fzf timg jp2a figlet mpv zathura curl jq
 -✍️ para usarlo se escribe media
 -❤️las carpetas van en el home la primera en mayúscula ejem Manga/Anim
 -📕Las portadas de los mangas deban de ir en la misma carpeta y renombrala a cover
@@ -52,3 +51,4 @@ q - Quit
 #Busqueda global
 <img width="1344" height="714" alt="2026-05-04-211231_hyprshot" src="https://github.com/user-attachments/assets/dbde1470-1ce5-4a37-887d-375b535eb8fc" />
 
+el archivo media metelo en .local/bin
